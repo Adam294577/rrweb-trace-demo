@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref } from 'vue'
 import { submitForm, type MockResult } from '../api/submitForm'
+import { useRecorder } from '../composables/useRecorder'
 import { emptyForm, validate, type FormErrors } from '../utils/validate'
 
+const { recording, saveFailed, start, submitStarted } = useRecorder()
 const form = reactive(emptyForm())
 const errors = ref<FormErrors>({})
 const mockResult = ref<MockResult>('success')
@@ -12,10 +14,13 @@ const locked = computed(() => state.value === 'submitting' || state.value === 's
 
 async function onSubmit() {
   if (locked.value) return
+  const { password: _, ...safe } = form
+  const report = submitStarted(safe)
   errors.value = validate(form)
   if (Object.keys(errors.value).length) {
     state.value = 'error'
     message.value = '請修正標示的欄位後再送出'
+    report({ status: 'invalid', message: Object.values(errors.value).join('、') })
     return
   }
   state.value = 'submitting'
@@ -24,24 +29,30 @@ async function onSubmit() {
     const { id } = await submitForm(mockResult.value)
     state.value = 'success'
     message.value = `送出成功，單號 ${id}`
+    report({ status: 'success', message: message.value })
   } catch (e) {
     state.value = 'error'
     message.value = `送出失敗：${(e as Error).message}`
+    report({ status: 'server-error', message: message.value })
   }
 }
 
-function restart() {
+async function restart() {
   Object.assign(form, emptyForm())
   errors.value = {}
   state.value = 'idle'
   message.value = ''
+  await nextTick()
+  start()
 }
 </script>
 
 <template>
   <section class="form-page">
     <h1>填寫表單</h1>
-    <p class="muted">此頁的操作會被錄製，密碼不會記錄。請勿輸入真實資料。</p>
+    <p class="muted">此頁的操作會被錄製，密碼不會記錄。請勿輸入真實資料。
+      <span class="tag" :class="{ invalid: recording }">{{ recording ? '● 錄製中' : '■ 已停止錄製' }}</span>
+    </p>
 
     <form class="card" novalidate autocomplete="off" @submit.prevent="onSubmit">
       <fieldset :disabled="locked">
@@ -90,6 +101,7 @@ function restart() {
       <div aria-live="polite">
         <div v-if="message" class="notice" :class="state === 'success' ? 'ok' : 'bad'">{{ message }}</div>
       </div>
+      <div v-if="saveFailed" class="notice bad">瀏覽器儲存空間不足，這次操作紀錄未能保存（不影響送出）。</div>
       <button v-if="state === 'success'" class="again" type="button" @click="restart">再填一筆</button>
     </form>
   </section>
