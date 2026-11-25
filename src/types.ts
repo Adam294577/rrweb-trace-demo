@@ -37,6 +37,11 @@ export interface TraceRecord {
   events: eventWithTime[]
 }
 
+export interface MailPayload {
+  status: 'sent' | 'simulated' | 'failed'
+  message: string
+}
+
 export interface ResultPayload {
   status: Extract<RecordStatus, 'invalid' | 'server-error' | 'success'>
   message: string

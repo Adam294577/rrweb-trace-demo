@@ -1,5 +1,5 @@
 import { EventType, IncrementalSource, NodeType, type eventWithTime, type serializedNodeWithId } from '@rrweb/types'
-import { FIELD_LABEL, type ResultPayload } from '../types'
+import { FIELD_LABEL, type MailPayload, type ResultPayload } from '../types'
 
 export interface TimelineItem {
   /** 距錄製開始的毫秒數；合併的輸入取最後一次，跳轉後可看到完整內容 */
@@ -54,6 +54,10 @@ export function buildTimeline(events: eventWithTime[]): TimelineItem[] {
     } else if (e.type === EventType.Custom) {
       lastInputId = null
       if (e.data.tag === 'submit') items.push({ offset, kind: 'submit', text: '按下送出' })
+      if (e.data.tag === 'mail') {
+        const { status, message } = e.data.payload as MailPayload
+        items.push({ offset, kind: status === 'failed' ? 'fail' : 'success', text: message })
+      }
       if (e.data.tag === 'result') {
         const { status, message } = e.data.payload as ResultPayload
         const prefix = status === 'invalid' ? '驗證失敗：' : ''

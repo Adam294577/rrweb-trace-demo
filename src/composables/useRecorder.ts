@@ -2,10 +2,10 @@ import { EventType, IncrementalSource, type eventWithTime } from '@rrweb/types'
 import { record } from 'rrweb'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { saveRecord } from '../services/recordStore'
-import type { RecordStatus, ResultPayload, SafeFormData } from '../types'
+import type { MailPayload, RecordStatus, ResultPayload, SafeFormData } from '../types'
 
 const MAX_DURATION = 5 * 60 * 1000
-/** 成功後續錄，讓成功訊息入鏡 */
+/** 寄信有結果後續錄，讓結果訊息入鏡 */
 const TAIL = 1000
 
 interface Session {
@@ -19,6 +19,12 @@ interface Session {
   stopRrweb: (() => void) | undefined
   limitTimer: number | undefined
   tailTimer: number | undefined
+}
+
+export interface SubmitReporter {
+  result(payload: ResultPayload): void
+  /** 回報寄信結果，之後結束錄製 */
+  mail(payload: MailPayload): void
 }
 
 export function useRecorder() {
@@ -98,20 +104,27 @@ export function useRecorder() {
     if (s.stopRrweb) record.addCustomEvent(tag, payload)
   }
 
-  /** 回傳回報結果的函式；期間若已離開或重新開始，回報會被忽略 */
-  function submitStarted(submission: SafeFormData): (result: ResultPayload) => void {
+  /** 期間若已離開或重新開始，回報會被忽略 */
+  function submitStarted(submission: SafeFormData): SubmitReporter {
     const s = session
-    if (!s) return () => {}
+    if (!s) return { result() {}, mail() {} }
     markDirty(s)
     s.status = 'submitting'
     s.submission = submission
     addEvent(s, 'submit', {})
-    return (result) => {
-      if (session !== s) return
-      s.status = result.status
-      addEvent(s, 'result', result)
-      save(s)
-      if (result.status === 'success') s.tailTimer = window.setTimeout(finish, TAIL)
+    return {
+      result(payload) {
+        if (session !== s) return
+        s.status = payload.status
+        addEvent(s, 'result', payload)
+        save(s)
+      },
+      mail(payload) {
+        if (session !== s) return
+        addEvent(s, 'mail', payload)
+        save(s)
+        s.tailTimer = window.setTimeout(finish, TAIL)
+      },
     }
   }
 

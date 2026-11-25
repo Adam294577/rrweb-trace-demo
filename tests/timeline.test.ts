@@ -44,6 +44,15 @@ describe('buildTimeline', () => {
       '輸入 備註 → hi',
     ]))
 
+  it('寄信結果', () =>
+    expect(
+      build(
+        custom(1, 'mail', { status: 'sent', message: '通知信已寄出' }),
+        custom(2, 'mail', { status: 'simulated', message: '通知信已模擬寄出' }),
+        custom(3, 'mail', { status: 'failed', message: '通知信寄送失敗' }),
+      ).map((i) => [i.kind, i.text]),
+    ).toEqual([['success', '通知信已寄出'], ['success', '通知信已模擬寄出'], ['fail', '通知信寄送失敗']]))
+
   it('結果', () =>
     expect(build(custom(1, 'result', { status: 'invalid', message: 'Email 格式錯誤' }), custom(2, 'result', { status: 'success', message: '送出成功' }))).toEqual([
       { offset: 1, kind: 'fail', text: '驗證失敗：Email 格式錯誤' },

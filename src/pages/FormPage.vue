@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref } from 'vue'
+import { sendMail } from '../api/sendMail'
 import { submitForm, type MockResult } from '../api/submitForm'
 import { useRecorder } from '../composables/useRecorder'
+import type { MailPayload, SafeFormData } from '../types'
 import { emptyForm, validate, type FormErrors } from '../utils/validate'
 
 const { recording, saveFailed, start, submitStarted } = useRecorder()
@@ -10,6 +12,9 @@ const errors = ref<FormErrors>({})
 const mockResult = ref<MockResult>('success')
 const state = ref<'idle' | 'submitting' | 'success' | 'error'>('idle')
 const message = ref('')
+const mail = ref<MailPayload | null>(null)
+const mailing = ref(false)
+let submitted: { id: string; form: SafeFormData } | null = null
 const locked = computed(() => state.value === 'submitting' || state.value === 'success')
 
 async function onSubmit() {
@@ -20,7 +25,7 @@ async function onSubmit() {
   if (Object.keys(errors.value).length) {
     state.value = 'error'
     message.value = '請修正標示的欄位後再送出'
-    report({ status: 'invalid', message: Object.values(errors.value).join('、') })
+    report.result({ status: 'invalid', message: Object.values(errors.value).join('、') })
     return
   }
   state.value = 'submitting'
@@ -29,17 +34,38 @@ async function onSubmit() {
     const { id } = await submitForm(mockResult.value)
     state.value = 'success'
     message.value = `送出成功，單號 ${id}`
-    report({ status: 'success', message: message.value })
+    report.result({ status: 'success', message: message.value })
+    submitted = { id, form: safe }
   } catch (e) {
     state.value = 'error'
     message.value = `送出失敗：${(e as Error).message}`
-    report({ status: 'server-error', message: message.value })
+    report.result({ status: 'server-error', message: message.value })
+    return
+  }
+  // 送單已成功，寄信結果不影響送單狀態
+  await notify()
+  if (mail.value) report.mail(mail.value)
+}
+
+async function notify() {
+  if (!submitted || mailing.value) return
+  mailing.value = true
+  mail.value = null
+  try {
+    const status = await sendMail(submitted.id, submitted.form)
+    mail.value = { status, message: status === 'sent' ? '通知信已寄出' : '通知信已模擬寄出（未設定 SMTP）' }
+  } catch (e) {
+    mail.value = { status: 'failed', message: `通知信寄送失敗：${(e as Error).message}` }
+  } finally {
+    mailing.value = false
   }
 }
 
 async function restart() {
   Object.assign(form, emptyForm())
   errors.value = {}
+  mail.value = null
+  submitted = null
   state.value = 'idle'
   message.value = ''
   await nextTick()
@@ -63,11 +89,11 @@ async function restart() {
         </div>
 
         <label class="field">姓名
-          <input v-model="form.name" name="name" />
+          <input v-model="form.name" name="name" maxlength="50" />
           <span v-show="errors.name" class="error">{{ errors.name }}</span>
         </label>
         <label class="field">Email
-          <input v-model="form.email" name="email" type="email" />
+          <input v-model="form.email" name="email" type="email" maxlength="254" />
           <span v-show="errors.email" class="error">{{ errors.email }}</span>
         </label>
         <label class="field">手機
@@ -88,7 +114,7 @@ async function restart() {
           <span v-show="errors.category" class="error">{{ errors.category }}</span>
         </label>
         <label class="field">備註
-          <textarea v-model="form.remark" name="remark" rows="3"></textarea>
+          <textarea v-model="form.remark" name="remark" rows="3" maxlength="1000"></textarea>
         </label>
         <div class="field">
           <label><input v-model="form.agree" name="agree" type="checkbox" /> 我同意條款</label>
@@ -100,9 +126,14 @@ async function restart() {
 
       <div aria-live="polite">
         <div v-if="message" class="notice" :class="state === 'success' ? 'ok' : 'bad'">{{ message }}</div>
+        <div v-if="mailing" class="notice">通知信寄送中…</div>
+        <div v-if="mail" class="notice" :class="mail.status === 'failed' ? 'bad' : 'ok'">{{ mail.message }}</div>
       </div>
       <div v-if="saveFailed" class="notice bad">瀏覽器儲存空間不足，這次操作紀錄未能保存（不影響送出）。</div>
-      <button v-if="state === 'success'" class="again" type="button" @click="restart">再填一筆</button>
+      <div v-if="state === 'success' && !mailing" class="after">
+        <button v-if="mail?.status === 'failed'" type="button" @click="notify">重寄通知信</button>
+        <button type="button" @click="restart">再填一筆</button>
+      </div>
     </form>
   </section>
 </template>
@@ -113,5 +144,5 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .mock { display: flex; gap: 18px; flex-wrap: wrap; padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
 .field { display: block; margin-bottom: 14px; }
 .field .error { display: block; }
-.again { margin-top: 12px; }
+.after { display: flex; gap: 12px; margin-top: 12px; }
 </style>
