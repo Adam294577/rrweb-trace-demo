@@ -1,5 +1,25 @@
-# Vue 3 + TypeScript + Vite
+# rrweb 操作追查 demo
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+用 rrweb 錄製表單操作，存入 localStorage，再重播當時的輸入與送出流程。
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+## 啟動
+```
+npm install
+npm run dev
+npm run test
+npm run build
+```
+
+## 操作
+1. 「填寫表單」頁輸入錯誤的 Email 後送出，觀察驗證失敗。
+2. 「模擬結果」選「伺服器錯誤 500」再送出，觀察伺服器失敗。
+3. 改選「成功」再送出。
+4. 到「操作紀錄」點「重播」，點時間軸可跳到該步驟。
+
+進入表單到成功或離開為一筆。有輸入但未送出就離開，也會留下紀錄。
+
+## 限制與正式使用注意
+- 「上傳」為模擬，資料只在本機瀏覽器；最多 20 筆，每筆自第一次輸入起最多錄 5 分鐘。
+- 只遮罩密碼，姓名、Email、手機以明文保存。正式系統應擴大遮罩、取得同意、設定保存期限，並分批送到後端。
+- 瀏覽器崩潰時，只保留最後一次送出時的內容。
+- rrweb 記錄畫面與操作，不含 API；送出與結果是以 `addCustomEvent` 另外寫入。
