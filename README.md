@@ -1,14 +1,27 @@
 # rrweb 操作追查 demo
 
-用 rrweb 錄製表單操作，存入 localStorage，再重播當時的輸入與送出流程。
+用 rrweb 錄製表單操作，存入 localStorage，再重播當時的輸入與送出流程。送單成功後由 Go + Gin 後端寄通知信。
 
 ## 啟動
+需要 Node 22.12 以上、Go 1.26.2 以上。
 ```
 npm install
-npm run dev
-npm run test
+npm run dev        # 同時啟動前端與後端
+npm run test       # 前端測試
+npm run test:api   # 後端測試
 npm run build
 ```
+
+## 寄信設定
+不設定也能跑：預設為模擬模式，信件內容印在終端機。
+
+要真的寄出：
+1. 將 `server/.env.example` 複製為 `server/.env`。
+2. Google 帳戶開啟兩步驟驗證，到 https://myaccount.google.com/apppasswords 產生應用程式密碼。
+3. 填入 `MAIL_TO`（收件）、`SMTP_USER`（寄件 Gmail）、`SMTP_PASS`（應用程式密碼）。
+4. 重新執行 `npm run dev`，終端機會顯示「真實寄信」。
+
+`.env` 已排除版控，請勿提交。寄信 API 沒有登入與限流，只監聽 127.0.0.1，不可直接對外開放。
 
 ## 操作
 1. 「填寫表單」頁輸入錯誤的 Email 後送出，觀察驗證失敗。
