@@ -14,6 +14,8 @@ const state = ref<'idle' | 'submitting' | 'success' | 'error'>('idle')
 const message = ref('')
 const mail = ref<MailPayload | null>(null)
 const mailing = ref(false)
+// rrweb 依元素記住上次的值並去重；換 key 重建元素，重填相同值才錄得到
+const formKey = ref(0)
 let submitted: { id: string; form: SafeFormData } | null = null
 const locked = computed(() => state.value === 'submitting' || state.value === 'success')
 
@@ -66,6 +68,7 @@ async function restart() {
   errors.value = {}
   mail.value = null
   submitted = null
+  formKey.value++
   state.value = 'idle'
   message.value = ''
   await nextTick()
@@ -80,7 +83,7 @@ async function restart() {
       <span class="tag" :class="{ invalid: recording }">{{ recording ? '● 錄製中' : '■ 已停止錄製' }}</span>
     </p>
 
-    <form class="card" novalidate autocomplete="off" @submit.prevent="onSubmit">
+    <form :key="formKey" class="card" novalidate autocomplete="off" @submit.prevent="onSubmit">
       <fieldset :disabled="locked">
         <div class="mock">
           <span>模擬結果</span>
